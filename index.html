@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pencatatan Kas</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <!-- Select2 untuk searchable dropdown -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <style>
+    body { font-family:"Poppins",sans-serif; margin:20px; background:#eef2f7; }
+    h1 { text-align:center; margin-bottom:25px; color:#333; font-size: 24px; }
+    .container { max-width:1000px; margin:auto; background:#fff; padding:25px; border-radius:15px; box-shadow:0 6px 15px rgba(0,0,0,.1); }
+    form { margin-bottom:25px; padding:20px; border:1px solid #e0e0e0; border-radius:12px; background:#fafafa; }
+    form h3 { margin-top:0; color:#007bff; font-size:18px; }
+    label { display:block; margin-top:10px; font-weight:600; color:#444; font-size:14px; }
+    input,select { width:100%; padding:10px; margin-top:6px; border:1px solid #ccc; border-radius:8px; font-size:14px; }
+    button { margin-top:15px; padding:10px 18px; border:none; border-radius:8px; background:#007bff; color:#fff; font-weight:600; cursor:pointer; transition:0.3s; font-size:14px; }
+    button:hover { background:#0056b3; transform:translateY(-2px); }
+    .inputRow { border-bottom:1px dashed #ccc; margin-bottom:10px; padding-bottom:10px; }
+    .inputRow button { background:#dc3545; margin-top:5px; font-size:12px; padding:6px 12px; }
+
+    .kpi { display:flex; gap:20px; justify-content:space-around; margin-top:20px; flex-wrap:wrap; }
+    .card { flex:1; min-width:180px; padding:20px; border-radius:15px; color:#fff; text-align:center; font-size:16px; font-weight:600; box-shadow:0 4px 10px rgba(0,0,0,.1); transition:0.3s; }
+    .card:hover { transform:scale(1.05); }
+    .initial { background:linear-gradient(135deg,#ffc107,#ffcd39); }
+    .income { background:linear-gradient(135deg,#28a745,#60d394); }
+    .expense { background:linear-gradient(135deg,#dc3545,#ff6f61); }
+    .balance { background:linear-gradient(135deg,#17a2b8,#4dd0e1); }
+
+    table { width:100%; border-collapse:collapse; margin-top:15px; font-size:14px; }
+    th, td { border:1px solid #ddd; padding:10px; text-align:left; white-space:nowrap; }
+    th { background:#007bff; color:#fff; }
+    tr:nth-child(even) { background:#f9f9f9; }
+    tr:hover { background:#f1f1f1; }
+    .status-lunas { background:#28a745; color:#fff; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:600; }
+    .status-belum { background:#dc3545; color:#fff; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:600; }
+
+    #loadingOverlay {
+      position: fixed; top:0; left:0; width:100%; height:100%;
+      background: rgba(255,255,255,0.85);
+      display: flex; justify-content: center; align-items: center;
+      z-index: 9999; font-size: 18px; flex-direction: column; color: #333;
+      display: none;
+    }
+    .spinner { border: 6px solid #e0e0e0; border-top: 6px solid #007bff; border-radius: 50%;
+      width: 60px; height: 60px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* 🔹 Responsif untuk HP */
+    @media (max-width: 768px) {
+      body { margin: 10px; }
+      h1 { font-size: 20px; }
+      .container { padding: 15px; border-radius: 10px; }
+      form { padding: 15px; }
+      .kpi { flex-direction: column; gap: 12px; }
+      .card { font-size: 14px; padding: 15px; min-width: auto; border-radius: 12px; }
+      label { font-size: 13px; }
+      input, select, button { font-size: 13px; padding: 8px; border-radius: 6px; }
+      .inputRow { padding-bottom: 8px; }
+      .inputRow button { font-size: 12px; padding: 6px 10px; }
+      table { font-size: 12px; display: block; overflow-x: auto; white-space: nowrap; border-radius: 8px; }
+      th, td { padding: 8px; }
+      #pageInfo { display: block; margin: 8px 0; font-size: 12px; }
+      button { width: 100%; margin-top: 10px; }
+    }
+
+    @media (max-width: 480px) {
+      h1 { font-size: 18px; }
+      .card { font-size: 13px; padding: 12px; }
+      table { font-size: 11px; }
+      th, td { padding: 6px; }
+      button { font-size: 12px; padding: 8px; }
+    }
+</style>
+
+</head>
+<body>
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <div>⏳ Memuat data, harap tunggu...</div>
+  </div>
+
+  <h1>📒 Sistem Pencatatan Kas</h1>
+  <script>
+  const PASSWORD = "bendahara@123"; // 🔑 ganti dengan kata sandimu
+  let userPass = prompt("🔒 Masukkan kata sandi untuk membuka halaman:");
+
+  if (userPass !== PASSWORD) {
+    alert("❌ Kata sandi salah! Akses ditolak.");
+    document.body.innerHTML = "<h2 style='text-align:center; color:red; margin-top:50px;'>🚫 Akses Ditolak</h2>";
+    throw new Error("Akses ditolak");
+  }
+</script>
+
+  <div class="container">
+
+    <form id="formPemasukan">
+      <h3>➕ Form Pemasukan</h3>
+      <div id="inputContainer">
+        <div class="inputRow">
+          <label>Nama Anggota</label>
+          <select name="nama[]" class="select-nama" required>
+            <option></option>
+            <option>AHMAD RIFAI ALFIANTO</option>
+        <option>AILSA NASYWA AZALIA</option>
+        <option>ALMASYAFA SALSABELA</option>
+        <option>A'MAL FARID</option>
+        <option>ANDITA RAFA RAMADHANI</option>
+        <option>ANNISA AYU FEBRIANTI</option>
+        <option>AULIA RAHMA PERTIWI</option>
+        <option>AURA SHIFA BUNGA RAMADHANI</option>
+        <option>AYU ANJANI PANGESTU</option>
+        <option>DAMAR SASI GIRIPASA</option>
+        <option>DINDA ZAHRA KURNIA</option>
+        <option>FAIZ PRATAMA PUTRA</option>
+        <option>FEYLLA AFITA RACHMAYANI</option>
+        <option>HUSNA AMNESTIFA ARIFIN</option>
+        <option>KEVIN DEANDRE PUTRA VALENCIA</option>
+        <option>LATHIFATUN SHOLEHAH</option>
+        <option>MAIZA KENESARAS ALMAGHFIRA</option>
+        <option>MUHAMMAD DAVIN SYAHVERO SUMARWAN</option>
+        <option>MUHAMMAD RIZAL</option>
+        <option>NABILAH MAHFUDHAH WIDYAS PUTRI</option>
+        <option>NAIFAH KHANSA AZAHRA</option>
+        <option>NATASYA ZAHRANI AZIZAH</option>
+        <option>NIMAS TIARA PUSPITA SARI</option>
+        <option>PUTRI WINDIA SARI</option>
+        <option>REVALINA SYAHRANI PUTRI</option>
+        <option>RISKY INDAH PUJI LESTARI</option>
+        <option>SAFIRA ARISTA MAHESWARI</option>
+        <option>SEPTIANA TRI RHOMADHONI</option>
+        <option>SHYLLA DZARA MADINA</option>
+        <option>SULIS SANTI WULANDARI</option>
+        <option>SYERIL PUTRI OCTAVIANTI</option>
+        <option>TIRTANIA SABRINA INDAH PUTRI</option>
+        <option>VALLENT CAHYA RAMADHAN</option>
+        <option>WEMY DIVA YUZAYBACH</option>
+        <option>YAYANG MEI ANGGITA</option>
+        <option>ZULFA MUNIFAH</option>
+          </select>
+          <label>Jumlah Bayar</label>
+          <input type="number" name="debit[]" required>
+          <label>Keterangan</label>
+          <input type="text" name="keterangan[]">
+          <button type="button" onclick="removeRow(this)">❌ Hapus</button>
+        </div>
+      </div>
+      <button type="button" onclick="addRow()">➕ Tambah Baris</button>
+      <button type="submit">💾 Simpan Semua</button>
+    </form>
+
+    <form id="formPengeluaran">
+      <h3>➖ Form Pengeluaran</h3>
+      <label>Keterangan</label>
+      <input type="text" name="keterangan" required>
+      <label>Jumlah Pengeluaran</label>
+      <input type="number" name="kredit" required>
+      <button type="submit">💾 Simpan Pengeluaran</button>
+    </form>
+
+    <div class="kpi">
+      <div class="card initial">Saldo Awal<br><span id="saldoAwal">Rp 0</span></div>
+      <div class="card income">Pemasukan<br><span id="totalPemasukan">Rp 0</span></div>
+      <div class="card expense">Pengeluaran<br><span id="totalPengeluaran">Rp 0</span></div>
+      <div class="card balance">Saldo<br><span id="totalSaldo">Rp 0</span></div>
+    </div>
+
+    <h3>📑 Riwayat Transaksi</h3>
+    <div class="scrollable">
+      <table>
+        <thead>
+          <tr><th>Tanggal</th><th>Nama</th><th>Keterangan</th><th>Debit</th><th>Kredit</th><th>Saldo</th></tr>
+        </thead>
+        <tbody id="tabelKas"></tbody>
+      </table>
+      <div style="margin-top:10px;text-align:center;">
+        <button onclick="prevPage()">⬅️ Prev</button>
+        <span id="pageInfo"></span>
+        <button onclick="nextPage()">Next ➡️</button>
+      </div>
+    </div>
+
+    <h3>💰 Status Utang Anggota</h3>
+    <div id="utangSection">
+      <table id="utangTable">
+        <thead>
+          <tr>
+            <th>Nama</th>
+            <th>Sudah Bayar</th>
+            <th>Total Kewajiban</th>
+            <th>Sisa Utang</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="tabelUtang"></tbody>
+      </table>
+    </div>
+    <button onclick="exportToWA()">📷 Export PNG & Kirim ke WA</button>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbx6xMP7iq7rZsj1jDsN25big-MWQeAOUJibrg3xSc7XFybPmXDxG-SDNZy0eIB8CboG1w/exec"; 
+const WA_MODE = "channel"; 
+const WA_CHANNEL_URL = "https://whatsapp.com/channel/0029VagczNE5q08fitx7Xs3O"; 
+const WA_ADMIN_NUMBER = "081392375768"; 
+const rupiah = n => 'Rp ' + (Number(n||0)).toLocaleString('id-ID');
+let transaksiData = []; let currentPage = 1; const rowsPerPage = 5;
+
+function showLoading(show){ document.getElementById("loadingOverlay").style.display = show?"flex":"none"; }
+
+async function loadData(){
+  showLoading(true);
+  try {
+    const res = await fetch(scriptURL);
+    const data = await res.json();
+    document.getElementById('saldoAwal').textContent = rupiah(data.saldoAwal);
+    document.getElementById('totalPemasukan').textContent = rupiah(data.pemasukan);
+    document.getElementById('totalPengeluaran').textContent = rupiah(data.pengeluaran);
+    document.getElementById('totalSaldo').textContent = rupiah(data.saldo);
+    transaksiData = data.dataKas; currentPage = 1; renderTable();
+    const utangBody = document.getElementById('tabelUtang');
+    utangBody.innerHTML = '';
+    data.statistik.forEach(row=>{
+      const status = row.utang<=0 ? `<span class="status-lunas">Lunas</span>` : `<span class="status-belum">Belum</span>`;
+      utangBody.innerHTML += `<tr>
+        <td>${row.nama}</td>
+        <td>${rupiah(row.totalBayar)}</td>
+        <td>${rupiah(data.mingguBerjalan * data.iuranMingguan)}</td>
+        <td>${rupiah(row.utang)}</td>
+        <td>${status}</td>
+      </tr>`;
+    });
+  } catch(err) { alert("⚠️ Gagal memuat data: "+err); } 
+  finally { showLoading(false); }
+}
+
+function renderTable(){
+  const tbody = document.getElementById('tabelKas'); tbody.innerHTML = '';
+  const start = (currentPage-1)*rowsPerPage; const end = start+rowsPerPage;
+  const slice = transaksiData.slice(start,end);
+  slice.forEach(r=>{
+    tbody.innerHTML += `<tr>
+      <td>${r.Tanggal||''}</td>
+      <td>${r.Nama||''}</td>
+      <td>${r.Keterangan||''}</td>
+      <td>${rupiah(r.Debit||0)}</td>
+      <td>${rupiah(r.Kredit||0)}</td>
+      <td>${rupiah(r.Saldo||0)}</td>
+    </tr>`;
+  });
+  document.getElementById("pageInfo").textContent = "Page "+currentPage+" / "+Math.ceil(transaksiData.length/rowsPerPage);
+}
+function prevPage(){ if(currentPage>1){currentPage--; renderTable();} }
+function nextPage(){ if(currentPage<Math.ceil(transaksiData.length/rowsPerPage)){currentPage++; renderTable();} }
+
+function addRow(){
+  const container=document.getElementById("inputContainer");
+  const row=document.createElement("div"); row.classList.add("inputRow");
+  row.innerHTML=`
+    <label>Nama Anggota</label>
+    <select name="nama[]" class="select-nama" required>
+      <option></option>
+      <option>AHMAD RIFAI ALFIANTO</option>
+        <option>AILSA NASYWA AZALIA</option>
+        <option>ALMASYAFA SALSABELA</option>
+        <option>A'MAL FARID</option>
+        <option>ANDITA RAFA RAMADHANI</option>
+        <option>ANNISA AYU FEBRIANTI</option>
+        <option>AULIA RAHMA PERTIWI</option>
+        <option>AURA SHIFA BUNGA RAMADHANI</option>
+        <option>AYU ANJANI PANGESTU</option>
+        <option>DAMAR SASI GIRIPASA</option>
+        <option>DINDA ZAHRA KURNIA</option>
+        <option>FAIZ PRATAMA PUTRA</option>
+        <option>FEYLLA AFITA RACHMAYANI</option>
+        <option>HUSNA AMNESTIFA ARIFIN</option>
+        <option>KEVIN DEANDRE PUTRA VALENCIA</option>
+        <option>LATHIFATUN SHOLEHAH</option>
+        <option>MAIZA KENESARAS ALMAGHFIRA</option>
+        <option>MUHAMMAD DAVIN SYAHVERO SUMARWAN</option>
+        <option>MUHAMMAD RIZAL</option>
+        <option>NABILAH MAHFUDHAH WIDYAS PUTRI</option>
+        <option>NAIFAH KHANSA AZAHRA</option>
+        <option>NATASYA ZAHRANI AZIZAH</option>
+        <option>NIMAS TIARA PUSPITA SARI</option>
+        <option>PUTRI WINDIA SARI</option>
+        <option>REVALINA SYAHRANI PUTRI</option>
+        <option>RISKY INDAH PUJI LESTARI</option>
+        <option>SAFIRA ARISTA MAHESWARI</option>
+        <option>SEPTIANA TRI RHOMADHONI</option>
+        <option>SHYLLA DZARA MADINA</option>
+        <option>SULIS SANTI WULANDARI</option>
+        <option>SYERIL PUTRI OCTAVIANTI</option>
+        <option>TIRTANIA SABRINA INDAH PUTRI</option>
+        <option>VALLENT CAHYA RAMADHAN</option>
+        <option>WEMY DIVA YUZAYBACH</option>
+        <option>YAYANG MEI ANGGITA</option>
+        <option>ZULFA MUNIFAH</option>
+    </select>
+    <label>Jumlah Bayar</label>
+    <input type="number" name="debit[]" required>
+    <label>Keterangan</label>
+    <input type="text" name="keterangan[]">
+    <button type="button" onclick="removeRow(this)">❌ Hapus</button>`;
+  container.appendChild(row); $(row).find('.select-nama').select2({placeholder:"Cari nama anggota...",allowClear:true});
+}
+function removeRow(btn){ btn.parentElement.remove(); }
+
+document.getElementById('formPemasukan').addEventListener('submit', async e=>{
+  e.preventDefault(); const fd=new FormData(e.target);
+  const namaArr=fd.getAll('nama[]'); const debitArr=fd.getAll('debit[]'); const ketArr=fd.getAll('keterangan[]');
+  try{ showLoading(true);
+    for(let i=0;i<namaArr.length;i++){
+      const body={tanggal:new Date().toLocaleDateString('id-ID'),nama:namaArr[i],keterangan:ketArr[i],debit:debitArr[i],kredit:0};
+      await fetch(scriptURL,{method:'POST',body:JSON.stringify(body)});
+    }
+    e.target.reset(); await loadData();
+  } catch(err){ alert("⚠️ Gagal mengirim ke server."); } finally{ showLoading(false); }
+});
+
+document.getElementById('formPengeluaran').addEventListener('submit', async e=>{
+  e.preventDefault(); const fd=new FormData(e.target);
+  const body={tanggal:new Date().toLocaleDateString('id-ID'),nama:'',keterangan:fd.get('keterangan'),debit:0,kredit:fd.get('kredit')};
+  try{ showLoading(true); await fetch(scriptURL,{method:'POST',body:JSON.stringify(body)}); e.target.reset(); await loadData();}
+  catch(err){ alert("⚠️ Gagal mengirim ke server."); } finally{ showLoading(false); }
+});
+
+function exportToWA() {
+  const element = document.getElementById("utangSection"); // bagian status utang
+  const table = document.getElementById("utangTable");
+
+  // Simpan style lama
+  const oldStyle = {
+    width: table.style.width,
+    maxWidth: table.style.maxWidth,
+    display: table.style.display,
+    overflow: element.style.overflow
+  };
+
+  // Paksa tabel full width (biar semua kolom tampil)
+  table.style.width = "max-content";
+  table.style.maxWidth = "none";
+  element.style.overflow = "visible";
+
+  html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    scrollX: 0,
+    scrollY: 0,
+    width: element.scrollWidth,
+    height: element.scrollHeight,
+    windowWidth: element.scrollWidth,
+    windowHeight: element.scrollHeight
+  }).then(canvas => {
+    // Kembalikan style lama
+    table.style.width = oldStyle.width;
+    table.style.maxWidth = oldStyle.maxWidth;
+    element.style.overflow = oldStyle.overflow;
+
+    // Simpan PNG otomatis
+    const imgData = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = "status_utang.png";
+    link.href = imgData;
+    link.click();
+
+    // Pesan WA
+    let waMessage = encodeURIComponent("📊 Update Status Utang Anggota:\n\nLihat detail pada gambar yang terlampir.");
+    if (WA_MODE === "channel") {
+      window.open(WA_CHANNEL_URL, "_blank");
+    } else {
+      window.open(`https://wa.me/${WA_ADMIN_NUMBER}?text=${waMessage}`, "_blank");
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded",()=>{ $('.select-nama').select2({placeholder:"Cari nama anggota...",allowClear:true}); });
+loadData();
+</script>
+</body>
+</html>
